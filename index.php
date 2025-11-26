@@ -160,7 +160,7 @@ if (isset($_POST["study"])) {
 <html>
 <head>
     <title>Study Tracker</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=<?= time() ?>">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap">
 </head>
 
