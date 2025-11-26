@@ -1,9 +1,50 @@
 <?php
-// ------ FILE DATA ------
+
+class Task {
+    // Properti Class (OOP 1: Property)
+    public $id;
+    public $title;
+    public $deadline;
+    public $priority;
+    public $status;
+
+    // Method Constructor (OOP 1: Method Khusus)
+    public function __construct($data) {
+        $this->id = $data['id']; // (Modul 1: Variabel & Tipe Data)
+        $this->title = $data['title'];
+        $this->deadline = $data['deadline'];
+        $this->priority = $data['priority'];
+        $this->status = $data['status'] ?? 'pending';
+    }
+
+    // Method untuk Menandai Selesai (OOP 1: Method)
+    public function markDone(&$stats) {
+        if ($this->status !== 'done') { // (Modul 2: Pengkondisian)
+            $this->status = 'done';
+            $stats["tasks_done"]++; // (Modul 1: Array)
+        }
+    }
+
+    // Method untuk Mendapatkan Data dalam bentuk Array
+    public function toArray() {
+        return [
+            "id" => $this->id,
+            "title" => $this->title,
+            "deadline" => $this->deadline,
+            "priority" => $this->priority,
+            "status" => $this->status
+        ];
+    }
+}
+
+// INISIALISASI DAN PENGATURAN FILE DATA
+
+// (Modul 1: Variabel & Tipe Data)
 $tasksFile = 'tasks.json';
 $statsFile = 'stats.json';
-$logFile = 'study_log.json'; // File baru untuk riwayat belajar
+$logFile = 'study_log.json';
 
+// Inisialisasi file jika belum ada (Modul 2: Pengkondisian | Modul 4: Function)
 if (!file_exists($tasksFile)) file_put_contents($tasksFile, json_encode([]));
 if (!file_exists($statsFile)) {
     file_put_contents($statsFile, json_encode([
@@ -13,48 +54,70 @@ if (!file_exists($statsFile)) {
         "streak" => 0
     ]));
 }
-// Inisialisasi file log belajar
 if (!file_exists($logFile)) file_put_contents($logFile, json_encode([]));
 
-$tasks = json_decode(file_get_contents($tasksFile), true);
+// Membaca data dari file (Modul 4: Function | Modul 1: Array)
+$rawTasks = json_decode(file_get_contents($tasksFile), true);
 $stats = json_decode(file_get_contents($statsFile), true);
 $studyLog = json_decode(file_get_contents($logFile), true);
 
+// Mengubah array mentah menjadi array of Task Objects (OOP 1: Object)
+$tasks = [];
+foreach ($rawTasks as $data) { // (Modul 3: Perulangan)
+    $tasks[] = new Task($data);
+}
+
 // ------ SORT BY DEADLINE ------
-usort($tasks, fn($a,$b) => strcmp($a['deadline'], $b['deadline']));
+// (Modul 4: Function)
+usort($tasks, fn($a,$b) => strcmp($a->deadline, $b->deadline));
+
+// LOGIC BACKEND (TAMBAH, SELESAI, HAPUS, BELAJAR)
 
 // ------ TAMBAH TUGAS ------
-if (isset($_POST['add'])) {
-    $tasks[] = [
-        "id" => time(),
+if (isset($_POST['add'])) { // (Modul 2: Pengkondisian)
+    // Membuat objek Task baru (OOP 1: Object Instantiation)
+    $newTask = new Task([
+        "id" => time(), // (Modul 4: Function)
         "title" => htmlspecialchars($_POST["title"]),
         "deadline" => $_POST["deadline"],
-        "priority" => $_POST["priority"],
-        "status" => "pending"
-    ];
-    file_put_contents($tasksFile, json_encode($tasks, JSON_PRETTY_PRINT));
+        "priority" => $_POST["priority"]
+    ]);
+    
+    $tasks[] = $newTask;
+
+    // Mengubah objek kembali ke array untuk disimpan (Modul 4: Function)
+    $tasksToSave = array_map(fn($t) => $t->toArray(), $tasks);
+    file_put_contents($tasksFile, json_encode($tasksToSave, JSON_PRETTY_PRINT));
+    
     header("Location: index.php");
     exit;
 }
 
 // ------ SELESAIKAN TUGAS ------
 if (isset($_GET["done"])) {
-    foreach ($tasks as &$t) {
-        if ($t["id"] == $_GET["done"]) {
-            $t["status"] = "done";
-            $stats["tasks_done"]++;
+    foreach ($tasks as $t) { // (Modul 3: Perulangan)
+        if ($t->id == $_GET["done"]) { // (Modul 2: Pengkondisian)
+            // Memanggil method dari Object Task (OOP 1: Method Call)
+            $t->markDone($stats);
         }
     }
-    file_put_contents($tasksFile, json_encode($tasks, JSON_PRETTY_PRINT));
+    
+    $tasksToSave = array_map(fn($t) => $t->toArray(), $tasks);
+    file_put_contents($tasksFile, json_encode($tasksToSave, JSON_PRETTY_PRINT));
     file_put_contents($statsFile, json_encode($stats, JSON_PRETTY_PRINT));
+    
     header("Location: index.php");
     exit;
 }
 
 // ------ HAPUS TUGAS ------
 if (isset($_GET["delete"])) {
-    $tasks = array_filter($tasks, fn($t)=>$t["id"] != $_GET["delete"]);
-    file_put_contents($tasksFile, json_encode($tasks, JSON_PRETTY_PRINT));
+    // (Modul 4: Function | Modul 1: Array)
+    $tasks = array_filter($tasks, fn($t)=>$t->id != $_GET["delete"]);
+    
+    $tasksToSave = array_map(fn($t) => $t->toArray(), $tasks);
+    file_put_contents($tasksFile, json_encode($tasksToSave, JSON_PRETTY_PRINT));
+    
     header("Location: index.php");
     exit;
 }
@@ -62,9 +125,9 @@ if (isset($_GET["delete"])) {
 // ------ MODE BELAJAR ------
 if (isset($_POST["study"])) {
     $minutes = intval($_POST["minutes"]);
-    $subject = htmlspecialchars($_POST["subject"]); // Ambil data Mata Kuliah
+    $subject = htmlspecialchars($_POST["subject"]);
 
-    // Update Statistik
+    // Update Statistik (Modul 1: Variabel & Tipe Data)
     $stats["total_minutes"] += $minutes;
 
     // Log Belajar Baru
@@ -75,7 +138,7 @@ if (isset($_POST["study"])) {
         "subject" => $subject
     ];
 
-    // Streak
+    // Streak Logic (Modul 2: Pengkondisian | Modul 4: Function)
     $today = date("Y-m-d");
     if ($stats["last_study_date"] == $today) {
         // same day
@@ -88,7 +151,7 @@ if (isset($_POST["study"])) {
     $stats["last_study_date"] = $today;
 
     file_put_contents($statsFile, json_encode($stats, JSON_PRETTY_PRINT));
-    file_put_contents($logFile, json_encode($studyLog, JSON_PRETTY_PRINT)); // Simpan log belajar
+    file_put_contents($logFile, json_encode($studyLog, JSON_PRETTY_PRINT));
     header("Location: index.php");
     exit;
 }
@@ -102,46 +165,35 @@ if (isset($_POST["study"])) {
 </head>
 
 <body>
-
 <div class="wrapper">
-
     <div class="left-panel">
-
         <div class="card">
             <h2>Tambah Tugas</h2>
             <form method="POST">
                 <label>Judul</label>
                 <input type="text" name="title" required>
-
                 <label>Deadline</label>
                 <input type="text" name="deadline" placeholder="format: YYYY-MM-DD (contoh: 2025-11-26)">
-
                 <label>Prioritas</label>
                 <select name="priority">
                     <option value="tinggi">Tinggi</option>
                     <option value="sedang">Sedang</option>
                     <option value="rendah">Rendah</option>
                 </select>
-
                 <button name="add" class="btn-add">Tambah</button>
             </form>
         </div>
 
         <div class="card pretty-form">
         <h2>Mode Belajar</h2>
-
         <form method="POST">
             <label>Mata Kuliah</label>
             <input type="text" name="subject" placeholder="Contoh: Pemrograman Web" required>
-
             <label>Durasi belajar (menit)</label>
             <input type="number" name="minutes" placeholder="Misal: 25" required>
-
             <button name="study" class="btn-add">Tambah</button>
         </form>
         </div>
-
-
 
         <div class="card">
             <h2>Daftar Tugas</h2>
@@ -153,36 +205,32 @@ if (isset($_POST["study"])) {
                     <th>Status</th>
                     <th>Aksi</th>
                 </tr>
-
                 <?php if (empty($tasks)): ?>
                     <tr>
                         <td colspan="5" style="text-align: center; color: #aaa;">Tidak ada tugas</td>
                     </tr>
                 <?php endif; ?>
 
-                <?php foreach ($tasks as $t): ?>
-                    <tr class="<?= $t['status'] == 'done' ? 'task-done' : '' ?>">
-                        <td><?= htmlspecialchars($t["title"]) ?></td>
-                        <td><?= $t["deadline"] ?: "-" ?></td>
-                        <td><?= ucfirst($t["priority"]) ?></td>
-                        <td><?= ucfirst($t["status"]) ?></td>
+                <?php foreach ($tasks as $t): // (Modul 3: Perulangan) ?>
+                    <tr class="<?= $t->status == 'done' ? 'task-done' : '' ?>">
+                        <td><?= htmlspecialchars($t->title) ?></td>
+                        <td><?= $t->deadline ?: "-" ?></td>
+                        <td><?= ucfirst($t->priority) ?></td>
+                        <td><?= ucfirst($t->status) ?></td>
                         <td>
-                            <?php if ($t["status"] == "pending"): ?>
-                                <a class="btn green" href="?done=<?= $t['id'] ?>">Selesai</a>
+                            <?php if ($t->status == "pending"): // (Modul 2: Pengkondisian) ?>
+                                <a class="btn green" href="?done=<?= $t->id ?>">Selesai</a>
                             <?php endif; ?>
-                            <a class="btn red" href="?delete=<?= $t['id'] ?>">Hapus</a>
+                            <a class="btn red" href="?delete=<?= $t->id ?>">Hapus</a>
                         </td>
                     </tr>
                 <?php endforeach; ?>
-
             </table>
         </div>
-
     </div>
 
 
     <div class="right-panel">
-
         <div class="card colored stat-pink">
             <h2>📊 Statistik Belajar</h2>
             <p><strong>Total durasi belajar:</strong> <?= $stats["total_minutes"] ?> menit</p>
@@ -203,7 +251,7 @@ if (isset($_POST["study"])) {
         <div class="card">
             <h2>📚 Riwayat Belajar Terbaru</h2>
             <?php
-            // Ambil 5 log terbaru dan balikkan urutannya
+            // Ambil 5 log terbaru dan balikkan urutannya (Modul 1: Array | Modul 4: Function)
             $recentLog = array_reverse(array_slice($studyLog, -5));
             if (!empty($recentLog)):
             ?>
@@ -218,9 +266,7 @@ if (isset($_POST["study"])) {
                 <p style="color: #aaa;">Belum ada sesi belajar yang dicatat.</p>
             <?php endif; ?>
         </div>
-        </div>
-
+    </div>
 </div>
-
 </body>
 </html>
