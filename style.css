@@ -1,0 +1,82 @@
+:root {
+    --left-size: 38%;
+    --right-size: 62%;
+}
+
+body {
+    margin: 0;
+    font-family: 'Inter', sans-serif;
+    background: #f4f6f8;
+}
+
+.wrapper {
+    display: grid;
+    grid-template-columns: var(--left-size) var(--right-size);
+    height: 100vh;
+}
+
+/* Panels */
+.left-panel {
+    background: white;
+    padding: 20px;
+    border-right: 2px solid #ddd;
+    overflow-y: auto;
+}
+
+.right-panel {
+    padding: 20px;
+    overflow-y: auto;
+}
+
+/* Cards */
+.card {
+    background: white;
+    padding: 18px;
+    border-radius: 12px;
+    margin-bottom: 18px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+.card.colored {
+    color: white;
+}
+
+.stat-pink { background: #ff6ba1; }
+.stat-blue { background: #6aa8ff; }
+.stat-green { background: #52d7a0; }
+
+/* Tabel */
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+th, td {
+    border-bottom: 1px solid #eee;
+    padding: 10px;
+    text-align: left;
+}
+th {
+    background: #3d6df2;
+    color: white;
+}
+
+/* Form */
+input, select {
+    width: 100%;
+    padding: 8px;
+    margin-top: 6px;
+    margin-bottom: 12px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+}
+
+/* Buttons */
+button, .btn {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    color: white;
+}
+.green { background: #28a745; }
+.red { background: #dc3545; }
