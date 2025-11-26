@@ -2,6 +2,7 @@
 // ------ FILE DATA ------
 $tasksFile = 'tasks.json';
 $statsFile = 'stats.json';
+$logFile = 'study_log.json'; // File baru untuk riwayat belajar
 
 if (!file_exists($tasksFile)) file_put_contents($tasksFile, json_encode([]));
 if (!file_exists($statsFile)) {
@@ -12,9 +13,12 @@ if (!file_exists($statsFile)) {
         "streak" => 0
     ]));
 }
+// Inisialisasi file log belajar
+if (!file_exists($logFile)) file_put_contents($logFile, json_encode([]));
 
 $tasks = json_decode(file_get_contents($tasksFile), true);
 $stats = json_decode(file_get_contents($statsFile), true);
+$studyLog = json_decode(file_get_contents($logFile), true);
 
 // ------ SORT BY DEADLINE ------
 usort($tasks, fn($a,$b) => strcmp($a['deadline'], $b['deadline']));
@@ -23,7 +27,7 @@ usort($tasks, fn($a,$b) => strcmp($a['deadline'], $b['deadline']));
 if (isset($_POST['add'])) {
     $tasks[] = [
         "id" => time(),
-        "title" => $_POST["title"],
+        "title" => htmlspecialchars($_POST["title"]),
         "deadline" => $_POST["deadline"],
         "priority" => $_POST["priority"],
         "status" => "pending"
@@ -58,7 +62,18 @@ if (isset($_GET["delete"])) {
 // ------ MODE BELAJAR ------
 if (isset($_POST["study"])) {
     $minutes = intval($_POST["minutes"]);
+    $subject = htmlspecialchars($_POST["subject"]); // Ambil data Mata Kuliah
+
+    // Update Statistik
     $stats["total_minutes"] += $minutes;
+
+    // Log Belajar Baru
+    $studyLog[] = [
+        "timestamp" => time(),
+        "date" => date("Y-m-d"),
+        "minutes" => $minutes,
+        "subject" => $subject
+    ];
 
     // Streak
     $today = date("Y-m-d");
@@ -73,6 +88,7 @@ if (isset($_POST["study"])) {
     $stats["last_study_date"] = $today;
 
     file_put_contents($statsFile, json_encode($stats, JSON_PRETTY_PRINT));
+    file_put_contents($logFile, json_encode($studyLog, JSON_PRETTY_PRINT)); // Simpan log belajar
     header("Location: index.php");
     exit;
 }
@@ -82,16 +98,15 @@ if (isset($_POST["study"])) {
 <head>
     <title>Study Tracker</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap">
 </head>
 
 <body>
 
 <div class="wrapper">
 
-    <!-- ================= LEFT PANEL ================= -->
     <div class="left-panel">
 
-        <!-- Tambah Tugas -->
         <div class="card">
             <h2>Tambah Tugas</h2>
             <form method="POST">
@@ -99,7 +114,7 @@ if (isset($_POST["study"])) {
                 <input type="text" name="title" required>
 
                 <label>Deadline</label>
-                <input type="date" name="deadline">
+                <input type="text" name="deadline" placeholder="format: YYYY-MM-DD (contoh: 2025-11-26)">
 
                 <label>Prioritas</label>
                 <select name="priority">
@@ -108,18 +123,19 @@ if (isset($_POST["study"])) {
                     <option value="rendah">Rendah</option>
                 </select>
 
-                <button name="add">Tambah</button>
+                <button name="add" class="btn-add">Tambah</button>
             </form>
         </div>
 
-        <!-- Mode Belajar -->
         <div class="card pretty-form">
         <h2>Mode Belajar</h2>
 
         <form method="POST">
+            <label>Mata Kuliah</label>
+            <input type="text" name="subject" placeholder="Contoh: Pemrograman Web" required>
 
             <label>Durasi belajar (menit)</label>
-            <input type="number" name="minutes" class="nice-input" placeholder="Misal: 25" required>
+            <input type="number" name="minutes" placeholder="Misal: 25" required>
 
             <button name="study" class="btn-add">Tambah</button>
         </form>
@@ -127,7 +143,6 @@ if (isset($_POST["study"])) {
 
 
 
-        <!-- Daftar Tugas -->
         <div class="card">
             <h2>Daftar Tugas</h2>
             <table>
@@ -139,8 +154,14 @@ if (isset($_POST["study"])) {
                     <th>Aksi</th>
                 </tr>
 
-                <?php foreach ($tasks as $t): ?>
+                <?php if (empty($tasks)): ?>
                     <tr>
+                        <td colspan="5" style="text-align: center; color: #aaa;">Tidak ada tugas</td>
+                    </tr>
+                <?php endif; ?>
+
+                <?php foreach ($tasks as $t): ?>
+                    <tr class="<?= $t['status'] == 'done' ? 'task-done' : '' ?>">
                         <td><?= htmlspecialchars($t["title"]) ?></td>
                         <td><?= $t["deadline"] ?: "-" ?></td>
                         <td><?= ucfirst($t["priority"]) ?></td>
@@ -160,10 +181,8 @@ if (isset($_POST["study"])) {
     </div>
 
 
-    <!-- ================= RIGHT PANEL ================= -->
     <div class="right-panel">
 
-        <!-- Statistik -->
         <div class="card colored stat-pink">
             <h2>📊 Statistik Belajar</h2>
             <p><strong>Total durasi belajar:</strong> <?= $stats["total_minutes"] ?> menit</p>
@@ -171,18 +190,35 @@ if (isset($_POST["study"])) {
             <p><strong>Streak belajar:</strong> <?= $stats["streak"] ?> hari</p>
         </div>
 
-        <!-- Statistik Tambahan -->
         <div class="card colored stat-blue">
             <h2>📅 Info Mingguan</h2>
-            <p>Total jam minggu ini: <strong><?= round($stats["total_minutes"]/60,1) ?></strong> jam</p>
+            <p>Total jam minggu ini: <strong><?= round($stats["total_minutes"]/60, 1) ?></strong> jam</p>
         </div>
 
         <div class="card colored stat-green">
             <h2>⏱ Progress Harian</h2>
             <p>Terakhir belajar: <strong><?= $stats["last_study_date"] ?: "-" ?></strong></p>
         </div>
-
-    </div>
+        
+        <div class="card">
+            <h2>📚 Riwayat Belajar Terbaru</h2>
+            <?php
+            // Ambil 5 log terbaru dan balikkan urutannya
+            $recentLog = array_reverse(array_slice($studyLog, -5));
+            if (!empty($recentLog)):
+            ?>
+            <ul>
+                <?php foreach ($recentLog as $log): ?>
+                    <li>
+                        <strong><?= htmlspecialchars($log['subject']) ?></strong> (<?= $log['minutes'] ?> menit) pada <?= $log['date'] ?>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+            <?php else: ?>
+                <p style="color: #aaa;">Belum ada sesi belajar yang dicatat.</p>
+            <?php endif; ?>
+        </div>
+        </div>
 
 </div>
 
