@@ -59,6 +59,10 @@ th {
     background: #3d6df2;
     color: white;
 }
+.task-done td {
+    color: #999;
+    text-decoration: line-through;
+}
 
 /* Form */
 input, select {
@@ -68,6 +72,12 @@ input, select {
     margin-bottom: 12px;
     border-radius: 8px;
     border: 1px solid #ccc;
+    box-sizing: border-box; /* Penting agar padding tidak melebarkan input */
+}
+label {
+    font-weight: bold;
+    display: block;
+    margin-top: 5px;
 }
 
 /* Buttons */
@@ -77,6 +87,29 @@ button, .btn {
     border: none;
     cursor: pointer;
     color: white;
+    text-decoration: none; /* Untuk tag <a> */
+    display: inline-block;
+    margin-right: 5px;
+}
+.btn-add {
+    background: #3d6df2;
+    width: 100%;
+    margin-top: 5px;
 }
 .green { background: #28a745; }
 .red { background: #dc3545; }
+
+/* Styling Riwayat Belajar */
+.card ul {
+    list-style: disc;
+    padding-left: 20px;
+    margin: 0;
+}
+.card ul li {
+    margin-bottom: 5px;
+    border-bottom: 1px dotted #eee;
+    padding-bottom: 5px;
+}
+.card ul li:last-child {
+    border-bottom: none;
+}
