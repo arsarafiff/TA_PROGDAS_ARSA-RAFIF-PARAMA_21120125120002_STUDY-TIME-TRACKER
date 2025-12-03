@@ -72,13 +72,9 @@ body {
     box-shadow: 0 4px 10px rgba(0,0,0,0.05);
 }
 
-.card.colored {
-    color: black;
-}
-
-.stat-pink { background: #ff6ba1; }
-.stat-blue { background: #6aa8ff; }
-.stat-green { background: #52d7a0; }
+.stat-pink { background: #ff6ba1; color: white}
+.stat-blue { background: #6aa8ff; color: white}
+.stat-green { background: #52d7a0; color: white}
 
 /* Tabel */
 table {
