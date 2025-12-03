@@ -1,6 +1,6 @@
 :root {
-    --left-size: 38%;
-    --right-size: 62%;
+    --left-size: 40%; 
+    --right-size: 60%;
 }
 
 body {
@@ -10,9 +10,44 @@ body {
 }
 
 .wrapper {
-    display: grid;
-    grid-template-columns: var(--left-size) var(--right-size);
+    display: flex; /* Ubah ke flex untuk tata letak vertikal */
+    flex-direction: column;
     height: 100vh;
+}
+
+.content-wrapper {
+    display: grid; /* Gunakan grid untuk panel kiri dan kanan */
+    grid-template-columns: var(--left-size) var(--right-size);
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+/* Navigasi */
+.top-nav {
+    display: flex;
+    background: #3d6df2; 
+    padding: 10px 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.nav-item {
+    color: white;
+    text-decoration: none;
+    padding: 10px 15px;
+    margin-right: 10px;
+    border-radius: 8px;
+    font-weight: bold;
+    transition: background 0.3s;
+}
+
+.nav-item:hover {
+    background: #2a58c0; /* saat hover */
+}
+
+.nav-item.active {
+    background: white;
+    color: #3d6df2; /* Teks biru pada latar belakang putih untuk menu aktif */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 /* Panels */
@@ -72,7 +107,7 @@ input, select {
     margin-bottom: 12px;
     border-radius: 8px;
     border: 1px solid #ccc;
-    box-sizing: border-box; /* Penting agar padding tidak melebarkan input */
+    box-sizing: border-box; 
 }
 label {
     font-weight: bold;
@@ -92,7 +127,7 @@ button, .btn {
     margin-right: 5px;
 }
 .btn-add {
-    /* Tombol Tambah berwarna Hijau */
+    /* Tombol Tambah */
     background: #28a745; 
     width: 100%;
     margin-top: 5px;
