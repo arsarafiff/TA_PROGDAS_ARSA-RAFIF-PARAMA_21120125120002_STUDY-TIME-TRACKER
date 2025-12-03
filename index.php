@@ -1,7 +1,7 @@
 <?php
 
+// OOP 1 class
 class Task {
-    // Properti Class (OOP 1: Property)
     public $id;
     public $title;
     public $deadline;
@@ -9,28 +9,25 @@ class Task {
     public $status;
     public $completion_date; 
 
-    // Method Constructor (OOP 1: Method Khusus)
-    public function __construct($data) {
-        $this->id = $data['id']; // (Modul 1: Variabel & Tipe Data)
+    public function __construct($data) {    // OOP 1 constructor
+        $this->id = $data['id'];    // variabel, tipe data, array
         $this->title = $data['title'];
         $this->deadline = $data['deadline'];
         $this->priority = $data['priority'];
-        $this->status = $data['status'] ?? 'pending';
-        // Ambil completion_date jika ada
+        $this->status = $data['status'] ?? 'pending';  
         $this->completion_date = $data['completion_date'] ?? null;
     }
 
-    // Method untuk Menandai Selesai (OOP 1: Method)
-    public function markDone(&$stats) { // Parameter $stats dilewatkan dengan referensi (&)
-        if ($this->status !== 'done') { // (Modul 2: Pengkondisian)
+    // Method untuk menandai selesai
+    public function markDone(&$stats) {   
+        if ($this->status !== 'done') { // pengkondisian
             $this->status = 'done';
-            // Mencatat tanggal dan waktu penyelesaian
-            $this->completion_date = date("Y-m-d H:i:s"); // (Modul 4: Function Date/Time)
-            $stats["tasks_done"]++; // (Modul 1: Array)
+            $this->completion_date = date("Y-m-d H:i:s");
+            $stats["tasks_done"]++; 
         }
     }
 
-    // Method untuk Mendapatkan Data dalam bentuk Array
+    // method mendapatkan data dalam bentuk array
     public function toArray() {
         return [
             "id" => $this->id, 
@@ -43,54 +40,84 @@ class Task {
     }
 }
 
-// Mendefinisikan nama file JSON. Fungsi utilitas untuk membaca/membuat file JSON jika belum ada. Memuat data tasks, stats, dan study log.
-$tasksFile = 'tasks.json'; // (Modul 1: Variabel & Tipe Data)
-$statsFile = 'stats.json';
-$logFile = 'study_log.json';
+$dataFile = 'data.json'; // Menyimpan tasks (pending) dan stats
+$logFile = 'log.json';   // Menyimpan done_tasks dan study_log
 
-// Function untuk memastikan file JSON ada dan memuat isinya
-function get_or_create_json($filename, $default_content = []) { // (Modul 4: Function)
-    if (!file_exists($filename)) { // (Modul 2: Pengkondisian)
+function get_or_create_json($filename, $default_content = []) {
+    if (!file_exists($filename)) {
         file_put_contents($filename, json_encode($default_content, JSON_PRETTY_PRINT));
         return $default_content;
     }
     return json_decode(file_get_contents($filename), true);
 }
 
-$rawTasks = get_or_create_json($tasksFile, []);
-$stats = get_or_create_json($statsFile, ["total_minutes" => 0, "tasks_done" => 0, "last_study_date" => "", "streak" => 0]);
-$studyLog = get_or_create_json($logFile, []);
+// Muat Data Aktif (Tasks PENDING & Stats)
+$data = get_or_create_json($dataFile, [
+    "tasks" => [], 
+    "stats" => ["total_minutes" => 0, "tasks_done" => 0, "last_study_date" => "", "streak" => 0]
+]);
 
-// Konversi data mentah ke array of Task Objects (OOP 1: Object Instantiation)
-$tasks = array_map(fn($data) => new Task($data), $rawTasks); // (Modul 4: Function Array)
+// Muat Data Log (Riwayat Tugas Selesai & Riwayat Belajar)
+$log = get_or_create_json($logFile, [
+    "done_tasks" => [], 
+    "study_log" => []
+]);
+
+// OOP 1 instansiasi objek
+$tasks = array_map(fn($data) => new Task($data), $data['tasks']); // $tasks kini mencatat tugas PENDING
+$stats = &$data['stats'];
+$doneLog = &$log['done_tasks'];
+$studyLog = &$log['study_log'];
 
 
-// Mengurutkan array $tasks (yang belum selesai) berdasarkan Deadline dan Prioritas sebelum ditampilkan.
-usort($tasks, function($a, $b) { // (Modul 4: Function Array)
+// Mengurutkan array $tasks
+usort($tasks, function($a, $b) {
     $priorityOrder = ['tinggi' => 3, 'sedang' => 2, 'rendah' => 1];
     $deadline_cmp = strcmp($a->deadline, $b->deadline);
     if ($deadline_cmp !== 0) return $deadline_cmp;
     return ($priorityOrder[$b->priority] ?? 0) - ($priorityOrder[$a->priority] ?? 0);
 });
 
-$mode = $_GET['mode'] ?? 'tugas'; // Menentukan mode tampilan awal
-
-// Menangani semua permintaan POST/GET (Tambah, Selesaikan, Hapus Tugas, dan Log Belajar). Memperbarui data di memori ($tasks, $stats, $studyLog).
+$mode = $_GET['mode'] ?? 'tugas';
 $redirect_mode = $mode;
 
-if (isset($_POST['add'])) { // Tambah Tugas (Modul 2: Pengkondisian)
+if (isset($_POST['add'])) { // Tambah Tugas
     $tasks[] = new Task(["id" => time(), "title" => htmlspecialchars($_POST["title"]), "deadline" => $_POST["deadline"], "priority" => $_POST["priority"]]);
     $redirect_mode = 'tugas';
+    
 } elseif (isset($_GET["done"])) { // Selesaikan Tugas
-    foreach ($tasks as $t) if ($t->id == $_GET["done"]) $t->markDone($stats); // Memanggil Method Class (OOP 1: Method Call)
-    file_put_contents($statsFile, json_encode($stats, JSON_PRETTY_PRINT));
+    $taskId = $_GET["done"];
+    $taskIndex = -1;
+    
+    foreach ($tasks as $index => $t) {
+        if ($t->id == $taskId) {
+            $t->markDone($stats);
+            $taskIndex = $index;
+            
+            // Catat entri ke Riwayat Tugas Selesai ($doneLog)
+            $doneLog[] = [
+                "title" => $t->title,
+                "completion_date" => $t->completion_date
+            ];
+            break; 
+        }
+    }
+    
+    // Hapus tugas yang selesai dari Daftar Tugas Aktif ($tasks)
+    if ($taskIndex !== -1) {
+        array_splice($tasks, $taskIndex, 1);
+    }
+
     $redirect_mode = 'tugas';
+
 } elseif (isset($_GET["delete"])) { // Hapus Tugas
-    $tasks = array_filter($tasks, fn($t)=>$t->id != $_GET["delete"]); // (Modul 4: Function Array)
+    // Tugas yang pending dihapus dari $tasks.
+    $tasks = array_filter($tasks, fn($t)=>$t->id != $_GET["delete"]);
     $redirect_mode = 'tugas';
+
 } elseif (isset($_POST["study"])) { // Log Belajar & Streak
     $minutes = intval($_POST["minutes"]);
-    $stats["total_minutes"] += $minutes; // (Modul 1: Array)
+    $stats["total_minutes"] += $minutes;
     $studyLog[] = ["timestamp" => time(), "date" => date("Y-m-d"), "minutes" => $minutes, "subject" => htmlspecialchars($_POST["subject"])];
 
     // Logika Streak
@@ -99,15 +126,20 @@ if (isset($_POST['add'])) { // Tambah Tugas (Modul 2: Pengkondisian)
         $stats["streak"] = ($stats["last_study_date"] == date("Y-m-d", strtotime("-1 day"))) ? $stats["streak"] + 1 : 1;
         $stats["last_study_date"] = $today;
     }
-    file_put_contents($statsFile, json_encode($stats, JSON_PRETTY_PRINT));
-    file_put_contents($logFile, json_encode($studyLog, JSON_PRETTY_PRINT));
+
     $redirect_mode = 'belajar';
 }
 
-// Menyimpan semua perubahan data dari memori ke file JSON yang relevan
 if (isset($_POST['add']) || isset($_GET["done"]) || isset($_GET["delete"]) || isset($_POST["study"])) {
-    $tasksToSave = array_map(fn($t) => $t->toArray(), $tasks);
-    file_put_contents($tasksFile, json_encode($tasksToSave, JSON_PRETTY_PRINT));
+    // Simpan Data Aktif (Tasks PENDING & Stats)
+    $data['tasks'] = array_map(fn($t) => $t->toArray(), $tasks); 
+    file_put_contents($dataFile, json_encode($data, JSON_PRETTY_PRINT));
+
+    // Simpan Data Log (Done Tasks & Study Log)
+    $log['done_tasks'] = $doneLog;
+    $log['study_log'] = $studyLog;
+    file_put_contents($logFile, json_encode($log, JSON_PRETTY_PRINT));
+    
     header("Location: index.php?mode=" . $redirect_mode);
     exit;
 }
@@ -168,16 +200,14 @@ if (isset($_POST['add']) || isset($_GET["done"]) || isset($_GET["delete"]) || is
                         <tr><td colspan="5" style="text-align: center; color: #aaa;">Tidak ada tugas</td></tr>
                     <?php endif; ?>
 
-                    <?php foreach ($tasks as $t): ?> // (Modul 3: Perulangan)
-                        <tr class="<?= $t->status == 'done' ? 'task-done' : '' ?>"> // (Modul 2: Pengkondisian)
+                    <?php foreach ($tasks as $t): ?>
+                        <tr>
                             <td><?= htmlspecialchars($t->title) ?></td>
                             <td><?= $t->deadline ?: "-" ?></td>
                             <td><?= ucfirst($t->priority) ?></td>
                             <td><?= ucfirst($t->status) ?></td>
                             <td>
-                                <?php if ($t->status == "pending"): ?>
-                                    <a class="btn green" href="?done=<?= $t->id ?>&mode=tugas">Selesai</a>
-                                <?php endif; ?>
+                                <a class="btn green" href="?done=<?= $t->id ?>&mode=tugas">Selesai</a>
                                 <a class="btn red" href="?delete=<?= $t->id ?>&mode=tugas">Hapus</a>
                             </td>
                         </tr>
@@ -185,21 +215,19 @@ if (isset($_POST['add']) || isset($_GET["done"]) || isset($_GET["delete"]) || is
                 </table>
             </div>
 
-            <div class="card colored stat-success"> 
-                <h2>✅ Riwayat Tugas Selesai</h2>
+            <div class="card"> 
+                <h2>✅ Riwayat Tugas Selesai </h2>
                 <?php
-                // Filter, Sort, dan Ambil 5 terbaru (Modul 4: Function Array)
-                $doneTasks = array_filter($tasks, fn($t) => $t->status == 'done' && $t->completion_date != null);
-                usort($doneTasks, fn($a, $b) => strcmp($b->completion_date, $a->completion_date));
-                $recentDoneTasks = array_slice($doneTasks, 0, 5);
+                // Mengambil 5 data terbaru dari $doneLog yang berasal dari log.json
+                $recentDoneTasks = array_reverse(array_slice($doneLog, -5));
 
                 if (!empty($recentDoneTasks)):
                 ?>
                 <ul>
                     <?php foreach ($recentDoneTasks as $t): ?>
                         <li>
-                            <strong><?= htmlspecialchars($t->title) ?></strong> diselesaikan pada 
-                            <?= date("Y-m-d", strtotime($t->completion_date)) ?> // (Modul 4: Date Formatting)
+                            <strong><?= htmlspecialchars($t['title']) ?></strong> diselesaikan pada 
+                            <?= date("Y-m-d", strtotime($t['completion_date'])) ?>
                         </li>
                     <?php endforeach; ?>
                 </ul>
@@ -211,7 +239,7 @@ if (isset($_POST['add']) || isset($_GET["done"]) || isset($_GET["delete"]) || is
             <div class="card colored stat-pink">
                 <h2>📊 Statistik Tugas</h2>
                 <p><strong>Tugas Selesai:</strong> <?= $stats["tasks_done"] ?></p>
-                <p><strong>Tugas Pending:</strong> <?= count(array_filter($tasks, fn($t) => $t->status == 'pending')) ?></p>
+                <p><strong>Tugas Pending:</strong> <?= count($tasks) ?></p> 
             </div>
             
             <?php elseif ($mode == 'belajar'): ?>
@@ -219,7 +247,8 @@ if (isset($_POST['add']) || isset($_GET["done"]) || isset($_GET["delete"]) || is
             <div class="card">
                 <h2>📚 Riwayat Belajar Terbaru</h2>
                 <?php
-                $recentLog = array_reverse(array_slice($studyLog, -5)); // (Modul 4: Function Array)
+                // Mengambil 5 data terbaru dari $studyLog yang berasal dari log.json
+                $recentLog = array_reverse(array_slice($studyLog, -5));
                 if (!empty($recentLog)): ?>
                 <ul>
                     <?php foreach ($recentLog as $log): ?>
