@@ -22,6 +22,18 @@ usort($tasks, function(Task $a, Task $b) {
 $mode = $_GET['mode'] ?? 'tugas';
 $redirect_mode = $mode;
 $action_performed = false;
+$edit_task = null;
+$edit_task_id = $_GET['edit'] ?? null;
+
+// Jika ada parameter edit, cari task yang akan diedit
+if ($edit_task_id) {
+    foreach ($tasks as $t) {
+        if ($t->getId() === (int)$edit_task_id) {
+            $edit_task = $t;
+            break;
+        }
+    }
+}
 
 // 4. Logika Controller (Pemrosesan POST/GET)
 if (isset($_POST['add'])) { // Tambah Tugas
@@ -31,6 +43,19 @@ if (isset($_POST['add'])) { // Tambah Tugas
         "deadline" => $_POST["deadline"], 
         "priority" => $_POST["priority"]
     ]);
+    $action_performed = true;
+    $redirect_mode = 'tugas';
+    
+} elseif (isset($_POST['edit'])) { // Edit Tugas
+    $taskId = (int)$_POST["task_id"];
+    foreach ($tasks as $t) {
+        if ($t->getId() === $taskId) {
+            $t->setTitle(htmlspecialchars($_POST["title"]));
+            $t->setDeadline($_POST["deadline"]);
+            $t->setPriority($_POST["priority"]);
+            break;
+        }
+    }
     $action_performed = true;
     $redirect_mode = 'tugas';
     
@@ -125,15 +150,23 @@ if ($action_performed) {
         <div class="left-panel">
             <?php if ($mode == 'tugas'): ?>
             <div class="card">
-                <h2>Tambah Tugas</h2>
+                <h2><?= $edit_task ? 'Edit Tugas' : 'Tambah Tugas' ?></h2>
                 <form method="POST">
-                    <label>Judul</label><input type="text" name="title" required>
-                    <label>Deadline</label><input type="text" name="deadline" placeholder="format: YYYY-MM-DD (contoh: 2025-11-26)">
+                    <?php if ($edit_task): ?>
+                        <input type="hidden" name="task_id" value="<?= $edit_task->getId() ?>">
+                    <?php endif; ?>
+                    <label>Judul</label><input type="text" name="title" value="<?= $edit_task ? htmlspecialchars($edit_task->getTitle()) : '' ?>" required>
+                    <label>Deadline</label><input type="text" name="deadline" placeholder="format: YYYY-MM-DD (contoh: 2025-11-26)" value="<?= $edit_task ? $edit_task->getDeadline() : '' ?>">
                     <label>Prioritas</label>
                     <select name="priority">
-                        <option value="tinggi">Tinggi</option><option value="sedang">Sedang</option><option value="rendah">Rendah</option>
+                        <option value="tinggi" <?= $edit_task && $edit_task->getPriority() === 'tinggi' ? 'selected' : '' ?>>Tinggi</option>
+                        <option value="sedang" <?= $edit_task && $edit_task->getPriority() === 'sedang' ? 'selected' : '' ?>>Sedang</option>
+                        <option value="rendah" <?= $edit_task && $edit_task->getPriority() === 'rendah' ? 'selected' : '' ?>>Rendah</option>
                     </select>
-                    <button name="add" class="btn-add">Tambah</button>
+                    <button name="<?= $edit_task ? 'edit' : 'add' ?>" class="btn-add"><?= $edit_task ? 'Simpan Perubahan' : 'Tambah' ?></button>
+                    <?php if ($edit_task): ?>
+                        <a href="?mode=tugas" class="btn" style="background-color: #aaa; color: white; text-decoration: none; display: inline-block; padding: 8px 12px; border-radius: 4px; margin-top: 8px;">Batal</a>
+                    <?php endif; ?>
                 </form>
             </div>
             
@@ -168,6 +201,7 @@ if ($action_performed) {
                             <td><?= ucfirst($t->getPriority()) ?></td> 
                             <td><?= ucfirst($t->getStatus()) ?></td> 
                             <td>
+                                <a class="btn blue" href="?edit=<?= $t->getId() ?>&mode=tugas">Edit</a>
                                 <a class="btn green" href="?done=<?= $t->getId() ?>&mode=tugas">Selesai</a> 
                                 <a class="btn red" href="?delete=<?= $t->getId() ?>&mode=tugas">Hapus</a>
                             </td>
