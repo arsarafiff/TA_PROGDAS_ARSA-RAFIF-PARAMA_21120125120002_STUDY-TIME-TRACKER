@@ -37,6 +37,19 @@ class Task {
         }
     }
 
+    // Metode Setter untuk Edit
+    public function setTitle(string $title): void {
+        $this->title = $title;
+    }
+
+    public function setDeadline(?string $deadline): void {
+        $this->deadline = $deadline;
+    }
+
+    public function setPriority(string $priority): void {
+        $this->priority = $priority;
+    }
+
     // Metode untuk penyimpanan (tetap penting untuk serialisasi)
     public function toArray(): array {
         return [
