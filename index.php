@@ -163,13 +163,13 @@ if ($action_performed) {
 
                     <?php foreach ($tasks as $t): ?>
                         <tr>
-                            <td><?= htmlspecialchars($t->title) ?></td>
-                            <td><?= $t->deadline ?: "-" ?></td>
-                            <td><?= ucfirst($t->priority) ?></td>
-                            <td><?= ucfirst($t->status) ?></td>
+                            <td><?= htmlspecialchars($t->getTitle()) ?></td> 
+                            <td><?= $t->getDeadline() ?: "-" ?></td> 
+                            <td><?= ucfirst($t->getPriority()) ?></td> 
+                            <td><?= ucfirst($t->getStatus()) ?></td> 
                             <td>
-                                <a class="btn green" href="?done=<?= $t->id ?>&mode=tugas">Selesai</a>
-                                <a class="btn red" href="?delete=<?= $t->id ?>&mode=tugas">Hapus</a>
+                                <a class="btn green" href="?done=<?= $t->getId() ?>&mode=tugas">Selesai</a> 
+                                <a class="btn red" href="?delete=<?= $t->getId() ?>&mode=tugas">Hapus</a>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -179,7 +179,7 @@ if ($action_performed) {
             <div class="card"> 
                 <h2>✅ Riwayat Tugas Selesai </h2>
                 <?php
-                // Mengambil 5 data terbaru dari $doneLog yang berasal dari log.json
+                // Mengambil 5 data terbaru dari $doneLog
                 $recentDoneTasks = array_reverse(array_slice($doneLog, -5));
 
                 if (!empty($recentDoneTasks)):
@@ -208,7 +208,7 @@ if ($action_performed) {
             <div class="card">
                 <h2>📚 Riwayat Belajar Terbaru</h2>
                 <?php
-                // Mengambil 5 data terbaru dari $studyLog yang berasal dari log.json
+                // Mengambil 5 data terbaru dari $studyLog
                 $recentLog = array_reverse(array_slice($studyLog, -5));
                 if (!empty($recentLog)): ?>
                 <ul>
