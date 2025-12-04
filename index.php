@@ -1,150 +1,111 @@
 <?php
+require_once 'Task.php';
+require_once 'DataManager.php';
 
-// OOP 1 class
-class Task {
-    public $id;
-    public $title;
-    public $deadline;
-    public $priority;
-    public $status;
-    public $completion_date; 
+// 1. Inisialisasi Data Manager & Muat Data
+$dm = new DataManager();
+$stats = $dm->getStats();
+$doneLog = $dm->getDoneTasks();
+$studyLog = $dm->getStudyLog();
 
-    public function __construct($data) {    // OOP 1 constructor
-        $this->id = $data['id'];    // variabel, tipe data, array
-        $this->title = $data['title'];
-        $this->deadline = $data['deadline'];
-        $this->priority = $data['priority'];
-        $this->status = $data['status'] ?? 'pending';  
-        $this->completion_date = $data['completion_date'] ?? null;
-    }
+// 2. Instansiasi Objek Task (Mapping dari array data JSON)
+$tasks = array_map(fn($data) => new Task($data), $dm->getTasksData());
 
-    // Method untuk menandai selesai
-    public function markDone(&$stats) {   
-        if ($this->status !== 'done') { // pengkondisian
-            $this->status = 'done';
-            $this->completion_date = date("Y-m-d H:i:s");
-            $stats["tasks_done"]++; 
-        }
-    }
-
-    // method mendapatkan data dalam bentuk array
-    public function toArray() {
-        return [
-            "id" => $this->id, 
-            "title" => $this->title, 
-            "deadline" => $this->deadline, 
-            "priority" => $this->priority, 
-            "status" => $this->status,
-            "completion_date" => $this->completion_date 
-        ];
-    }
-}
-
-$dataFile = 'data.json'; // Menyimpan tasks (pending) dan stats
-$logFile = 'log.json';   // Menyimpan done_tasks dan study_log
-
-function get_or_create_json($filename, $default_content = []) {
-    if (!file_exists($filename)) {
-        file_put_contents($filename, json_encode($default_content, JSON_PRETTY_PRINT));
-        return $default_content;
-    }
-    return json_decode(file_get_contents($filename), true);
-}
-
-// Muat Data Aktif (Tasks PENDING & Stats)
-$data = get_or_create_json($dataFile, [
-    "tasks" => [], 
-    "stats" => ["total_minutes" => 0, "tasks_done" => 0, "last_study_date" => "", "streak" => 0]
-]);
-
-// Muat Data Log (Riwayat Tugas Selesai & Riwayat Belajar)
-$log = get_or_create_json($logFile, [
-    "done_tasks" => [], 
-    "study_log" => []
-]);
-
-// OOP 1 instansiasi objek
-$tasks = array_map(fn($data) => new Task($data), $data['tasks']); // $tasks kini mencatat tugas PENDING
-$stats = &$data['stats'];
-$doneLog = &$log['done_tasks'];
-$studyLog = &$log['study_log'];
-
-
-// Mengurutkan array $tasks
-usort($tasks, function($a, $b) {
+// 3. Logika Pengurutan
+usort($tasks, function(Task $a, Task $b) {
     $priorityOrder = ['tinggi' => 3, 'sedang' => 2, 'rendah' => 1];
-    $deadline_cmp = strcmp($a->deadline, $b->deadline);
+    $deadline_cmp = strcmp($a->getDeadline() ?? '9999-12-31', $b->getDeadline() ?? '9999-12-31');
     if ($deadline_cmp !== 0) return $deadline_cmp;
-    return ($priorityOrder[$b->priority] ?? 0) - ($priorityOrder[$a->priority] ?? 0);
+    return ($priorityOrder[$b->getPriority()] ?? 0) - ($priorityOrder[$a->getPriority()] ?? 0);
 });
 
 $mode = $_GET['mode'] ?? 'tugas';
 $redirect_mode = $mode;
+$action_performed = false;
 
+// 4. Logika Controller (Pemrosesan POST/GET)
 if (isset($_POST['add'])) { // Tambah Tugas
-    $tasks[] = new Task(["id" => time(), "title" => htmlspecialchars($_POST["title"]), "deadline" => $_POST["deadline"], "priority" => $_POST["priority"]]);
+    $tasks[] = new Task([
+        "id" => time(), 
+        "title" => htmlspecialchars($_POST["title"]), 
+        "deadline" => $_POST["deadline"], 
+        "priority" => $_POST["priority"]
+    ]);
+    $action_performed = true;
     $redirect_mode = 'tugas';
     
 } elseif (isset($_GET["done"])) { // Selesaikan Tugas
-    $taskId = $_GET["done"];
-    $taskIndex = -1;
+    $taskId = (int)$_GET["done"];
     
-    foreach ($tasks as $index => $t) {
-        if ($t->id == $taskId) {
-            $t->markDone($stats);
-            $taskIndex = $index;
-            
-            // Catat entri ke Riwayat Tugas Selesai ($doneLog)
-            $doneLog[] = [
-                "title" => $t->title,
-                "completion_date" => $t->completion_date
-            ];
-            break; 
+    // Menggunakan array_filter dan array_values untuk membuat array tugas baru (filter tugas yang selesai)
+    $tasks_pending = [];
+    $task_moved = null;
+
+    foreach ($tasks as $t) {
+        if ($t->getId() === $taskId) {
+            $t->markDone(); 
+            $task_moved = $t;
+        } else {
+            $tasks_pending[] = $t;
         }
     }
     
-    // Hapus tugas yang selesai dari Daftar Tugas Aktif ($tasks)
-    if ($taskIndex !== -1) {
-        array_splice($tasks, $taskIndex, 1);
+    if ($task_moved) {
+        // Update Stats & Log
+        $stats["tasks_done"]++;
+        $doneLog[] = [
+            "title" => $task_moved->getTitle(),
+            "completion_date" => $task_moved->getCompletionDate()
+        ];
+        $dm->setDoneTasks($doneLog); // Simpan log baru ke DataManager
+        $dm->setStats($stats);       // Simpan stats baru ke DataManager
     }
 
+    $tasks = $tasks_pending; // Update daftar tugas
+    $action_performed = true;
     $redirect_mode = 'tugas';
 
 } elseif (isset($_GET["delete"])) { // Hapus Tugas
-    // Tugas yang pending dihapus dari $tasks.
-    $tasks = array_filter($tasks, fn($t)=>$t->id != $_GET["delete"]);
+    $taskId = (int)$_GET["delete"];
+    // Hapus tugas yang pending
+    $tasks = array_values(array_filter($tasks, fn(Task $t) => $t->getId() !== $taskId));
+    $action_performed = true;
     $redirect_mode = 'tugas';
 
 } elseif (isset($_POST["study"])) { // Log Belajar & Streak
     $minutes = intval($_POST["minutes"]);
-    $stats["total_minutes"] += $minutes;
-    $studyLog[] = ["timestamp" => time(), "date" => date("Y-m-d"), "minutes" => $minutes, "subject" => htmlspecialchars($_POST["subject"])];
-
-    // Logika Streak
-    $today = date("Y-m-d");
-    if ($stats["last_study_date"] !== $today) {
-        $stats["streak"] = ($stats["last_study_date"] == date("Y-m-d", strtotime("-1 day"))) ? $stats["streak"] + 1 : 1;
-        $stats["last_study_date"] = $today;
+    $subject = htmlspecialchars($_POST["subject"]);
+    
+    if ($minutes > 0) {
+        $stats["total_minutes"] += $minutes;
+        
+        $dm->addStudyLog(["timestamp" => time(), "date" => date("Y-m-d"), "minutes" => $minutes, "subject" => $subject]);
+        
+        // Logika Streak
+        $today = date("Y-m-d");
+        if ($stats["last_study_date"] !== $today) {
+            $yesterday = date("Y-m-d", strtotime("-1 day"));
+            $stats["streak"] = ($stats["last_study_date"] === $yesterday) ? $stats["streak"] + 1 : 1;
+            $stats["last_study_date"] = $today;
+        }
+        $dm->setStats($stats); // Simpan stats baru
     }
 
+    $action_performed = true;
     $redirect_mode = 'belajar';
 }
 
-if (isset($_POST['add']) || isset($_GET["done"]) || isset($_GET["delete"]) || isset($_POST["study"])) {
-    // Simpan Data Aktif (Tasks PENDING & Stats)
-    $data['tasks'] = array_map(fn($t) => $t->toArray(), $tasks); 
-    file_put_contents($dataFile, json_encode($data, JSON_PRETTY_PRINT));
-
-    // Simpan Data Log (Done Tasks & Study Log)
-    $log['done_tasks'] = $doneLog;
-    $log['study_log'] = $studyLog;
-    file_put_contents($logFile, json_encode($log, JSON_PRETTY_PRINT));
+// 5. Penyimpanan Data dan Redirect
+if ($action_performed) {
+    // Simpan semua tugas aktif (dalam format array) ke DataManager
+    $dm->setTasksData(array_map(fn(Task $t) => $t->toArray(), $tasks)); 
+    $dm->saveData();
     
     header("Location: index.php?mode=" . $redirect_mode);
     exit;
 }
-?>
 
+?>
 <!DOCTYPE html>
 <html>
 <head>
